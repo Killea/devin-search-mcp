@@ -12,13 +12,20 @@ protocol logic are adapted from those projects, which in turn credit
 Windsurf/Codeium Connect/protobuf protocol implementation.
 
 Upstream copyright and MIT license terms are preserved (see LICENSE). The
-`lib/` directory is the upstream search core, kept byte-for-byte identical so
-the ported surface is trivially diffable against the reference. Only the
-host glue (`main.js` in the PI-Desktop plugin) was rewritten here as
-`server.js` to run as a stdio MCP server:
+`lib/` directory is the upstream search core, kept as close to the reference
+as practical so the ported surface is easy to diff. Only the host glue
+(`main.js` in the PI-Desktop plugin) was rewritten here as `server.js` to run
+as a stdio MCP server:
 
   - PI-Desktop `pi.fs.*`      -> a `node:fs` adapter (workspace-relative)
   - PI-Desktop `pi.net.fetch` -> global `fetch`
   - PI-Desktop workspace      -> process working directory / DEVIN_SEARCH_WORKSPACE
   - PI-Desktop panel login    -> a CLI command (`node server.js login`)
   - PI-Desktop tool registry  -> MCP `tools/list` + `tools/call`
+
+One intentional deviation from upstream, in `lib/code-search.js`: an `rg`
+command with a missing/empty pattern is rejected at command-validation time and
+steered back to the planning model, instead of hard-failing the whole search
+mid-execution. Upstream checked this only inside the sandbox, where it was
+fatal, but the cloud planning model does emit malformed `rg` commands; this
+makes code_search robust to them.

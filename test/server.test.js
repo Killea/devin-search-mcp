@@ -7,7 +7,7 @@ const path = require("node:path");
 const fsp = require("node:fs/promises");
 
 const { NodeFs, buildAuthUrl, statusText, normalizeGrant, _internal } = require("../server");
-const { wildcard, isForbiddenPath, parseAnswer, parseStructuredAnswer } = require("../lib/code-search");
+const { wildcard, isForbiddenPath, parseAnswer, parseStructuredAnswer, command } = require("../lib/code-search");
 const { loadIgnoreRules, isIgnored } = require("../lib/gitignore");
 const { Writer, decode, stringField } = require("../lib/protobuf");
 const { frame, streamText } = require("../lib/protocol");
@@ -74,6 +74,15 @@ test("isForbiddenPath rejects sensitive/generated segments", () => {
   assert.ok(isForbiddenPath("certs/server.pem"));
   assert.ok(!isForbiddenPath("src/main.ts"));
   assert.ok(!isForbiddenPath("docs/readme.md"));
+});
+
+test("command: rg requires a nonempty pattern; ls/glob/readfile do not", () => {
+  assert.throws(() => command({ op: "rg", path: "/codebase" }), /nonempty pattern/);
+  assert.throws(() => command({ op: "rg", path: "/codebase", pattern: "   " }), /nonempty pattern/);
+  assert.doesNotThrow(() => command({ op: "rg", path: "/codebase", pattern: "x" }));
+  assert.doesNotThrow(() => command({ op: "ls", path: "/codebase" }));
+  assert.doesNotThrow(() => command({ op: "glob", path: "/codebase", pattern: "*.js" }));
+  assert.doesNotThrow(() => command({ op: "readfile", path: "/codebase/a.js", start: 1, end: 10 }));
 });
 
 test("parseAnswer (strict XML) extracts file ranges", () => {
