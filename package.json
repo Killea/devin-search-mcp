@@ -1,0 +1,41 @@
+{
+  "name": "devin-search-mcp",
+  "version": "0.1.0",
+  "description": "MCP stdio server exposing Devin cloud web_search and code_search (cloud-planned, locally verified, read-only). Port of leafmoes/pi-devin-search (MIT).",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "devin",
+    "windsurf",
+    "code-search",
+    "web-search",
+    "zcode"
+  ],
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "server.js",
+  "bin": {
+    "devin-search-mcp": "./server.js"
+  },
+  "files": [
+    "server.js",
+    "lib",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node server.js",
+    "serve": "node server.js",
+    "login": "node server.js login",
+    "logout": "node server.js logout",
+    "status": "node server.js status",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  }
+}

@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# The reference clone lives here for local porting only; never committed.
+reference/
+
+# Credentials & local secrets (the server stores these outside the repo in
+# ~/.devin-search-mcp, but never let a stray copy in).
+credentials.json
+*.credentials.json
+.env
+
+# Logs & editor/OS noise
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/
+
+# Build output (none expected; kept for safety)
+dist/
+*.tmp
