@@ -140,6 +140,25 @@ Returns formatted `title / url / snippet` blocks as text.
 Runs up to 8 cloud-planned turns (6 command turns + 2), a 90 s deadline, single-concurrent,
 and verifies every cited file/range against the workspace before returning it.
 
+## Rate limits & errors
+
+Both tools surface distinct, actionable errors instead of a generic failure:
+
+- **Rate limit / quota.** If Devin throttles the account (HTTP `429`) or its upstream is over
+  capacity (`503`), the tools report a clear throttle message:
+
+  > *Devin is throttling requests right now (rate limit / usage quota / upstream capacity).
+  > Wait a moment and retry — the free tier has unpublished daily/weekly quotas, so this is
+  > usually transient.*
+
+  This replaces the previous generic "failed on all hosts" / "completion request failed" text,
+  so a throttle is obvious at a glance. The free Devin tier has daily/weekly usage quotas whose
+  size is not published per account; the fast model these tools use (`swe-1-6-fast`) is
+  normally unmetered, so throttling is usually transient.
+- **Session rejected.** A `401`/`403` is treated as an auth rejection — the stored grant is
+  marked revoked and you're told to run `login` again.
+- **Not logged in / expired.** Run `node server.js login`.
+
 ## Tests
 
 ```sh

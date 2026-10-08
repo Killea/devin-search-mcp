@@ -11,7 +11,7 @@ const { wildcard, isForbiddenPath, parseAnswer, parseStructuredAnswer, command }
 const { loadIgnoreRules, isIgnored } = require("../lib/gitignore");
 const { Writer, decode, stringField } = require("../lib/protobuf");
 const { frame, streamText } = require("../lib/protocol");
-const { redact } = require("../lib/core");
+const { redact, isRateLimitStatus, rateLimitMessage } = require("../lib/core");
 
 /* ------------------------------------------------------------------ NodeFs */
 
@@ -126,6 +126,20 @@ test("redact hides session-secret fragments", () => {
   assert.equal(redact("hello abc123 world", ["devin-session-token$abc123"]), "hello [redacted] world");
 });
 
+test("isRateLimitStatus flags 429/503 (and only those); message says retry", () => {
+  assert.ok(isRateLimitStatus(429));
+  assert.ok(isRateLimitStatus(503));
+  assert.ok(isRateLimitStatus("429")); // numeric string
+  assert.ok(!isRateLimitStatus(200));
+  assert.ok(!isRateLimitStatus(401)); // still an auth rejection, not a throttle
+  assert.ok(!isRateLimitStatus(403));
+  assert.ok(!isRateLimitStatus(404));
+  assert.ok(!isRateLimitStatus(500));
+  assert.ok(!isRateLimitStatus(0));
+  assert.match(rateLimitMessage(), /throttl/i);
+  assert.match(rateLimitMessage(), /retry/i);
+});
+
 /* ------------------------------------------------------------- login/CLI */
 
 test("buildAuthUrl emits PKCE S256 params on the Devin auth host", () => {
@@ -167,6 +181,43 @@ test("web_search and code_search surface a clean login error when not logged in"
     assert.equal(code.isError, true);
     assert.match(code.content[0].text, /log in/i);
   } finally {
+    if (oldCred === undefined) delete process.env.DEVIN_SEARCH_CREDENTIALS_DIR;
+    else process.env.DEVIN_SEARCH_CREDENTIALS_DIR = oldCred;
+    if (oldWs === undefined) delete process.env.DEVIN_SEARCH_WORKSPACE;
+    else process.env.DEVIN_SEARCH_WORKSPACE = oldWs;
+    await fsp.rm(credDir, { recursive: true, force: true });
+    await fsp.rm(ws, { recursive: true, force: true });
+  }
+});
+
+test("web_search surfaces a clear rate-limit message when Devin throttles (429)", async () => {
+  const credDir = await fsp.mkdtemp(path.join(os.tmpdir(), "dsh-cred429-"));
+  const ws = await fsp.mkdtemp(path.join(os.tmpdir(), "dsh-ws429-"));
+  const oldCred = process.env.DEVIN_SEARCH_CREDENTIALS_DIR;
+  const oldWs = process.env.DEVIN_SEARCH_WORKSPACE;
+  const realFetch = global.fetch;
+  process.env.DEVIN_SEARCH_CREDENTIALS_DIR = credDir;
+  process.env.DEVIN_SEARCH_WORKSPACE = ws;
+  // A valid, unexpired grant so web_search clears the login gate before it fetches.
+  const grant = normalizeGrant({
+    version: 1,
+    token: "test.jwt.token",
+    expiresAt: Date.now() + 3600000,
+    expirySource: "fallback",
+  });
+  try {
+    await fsp.writeFile(path.join(credDir, "credentials.json"), JSON.stringify(grant));
+    // Both Devin hosts answer 429 (rate limit / usage quota / capacity).
+    global.fetch = async () => ({ status: 429, text: async () => "" });
+
+    const web = await _internal.invokeTool("web_search", { query: "hello" });
+    assert.equal(web.isError, true);
+    assert.match(web.content[0].text, /throttl/i);
+    assert.match(web.content[0].text, /retry/i);
+    // The clear throttle message must replace the generic all-hosts failure.
+    assert.doesNotMatch(web.content[0].text, /failed on all hosts/i);
+  } finally {
+    global.fetch = realFetch;
     if (oldCred === undefined) delete process.env.DEVIN_SEARCH_CREDENTIALS_DIR;
     else process.env.DEVIN_SEARCH_CREDENTIALS_DIR = oldCred;
     if (oldWs === undefined) delete process.env.DEVIN_SEARCH_WORKSPACE;

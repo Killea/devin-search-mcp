@@ -41,6 +41,8 @@ const {
   toDevinSessionToken,
   expiry,
   redact,
+  isRateLimitStatus,
+  rateLimitMessage,
   check,
   deadline,
 } = require("./lib/core");
@@ -465,6 +467,7 @@ async function webSearch(args) {
   const token = toDevinSessionToken(grant.token);
 
   let authRejected = 0;
+  let rateLimited = false;
   let hostsTried = 0;
 
   for (const host of WEB_HOSTS) {
@@ -499,6 +502,10 @@ async function webSearch(args) {
 
     if (response.status === 401 || response.status === 403) {
       authRejected += 1;
+      continue;
+    }
+    if (isRateLimitStatus(response.status)) {
+      rateLimited = true; // a 429/503 is account-level, but the second host is cheap — try it before reporting
       continue;
     }
     if (response.status < 200 || response.status >= 300) continue;
@@ -552,6 +559,9 @@ async function webSearch(args) {
       await writeGrant({ ...current, revoked: true });
     }
     fail("login", "Devin session rejected; please log in again.");
+  }
+  if (rateLimited) {
+    fail("ratelimit", rateLimitMessage());
   }
   fail("network", "Devin web search failed on all hosts.");
 }
