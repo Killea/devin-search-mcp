@@ -82,17 +82,26 @@ Add a stdio MCP server to `~/.zcode/cli/config.json`:
     "servers": {
       "devin-search": {
         "type": "stdio",
-        "command": "node",
-        "args": ["/absolute/path/to/devin-search-mcp/server.js"],
-        "cwd": "/absolute/path/to/your/project"   // workspace searched by code_search
+        // use an ABSOLUTE path to node — ZCode's spawn PATH may be minimal
+        "command": "/abs/path/to/node",
+        "args": ["/abs/path/to/devin-search-mcp/server.js"],
+        // keep this above code_search's 90 s internal deadline (MCP default is 30 s)
+        "timeoutMs": 120000
       }
     }
   }
 }
 ```
 
-`cwd` is the workspace `code_search` reads from. If omitted, the server uses its process
-working directory (or set `DEVIN_SEARCH_WORKSPACE`).
+- **`cwd` is optional (and usually better left out).** When omitted, `code_search` searches
+  the **active ZCode project** — the server inherits its working directory from the client,
+  so it follows whatever folder you're working in. Set `cwd` (or `DEVIN_SEARCH_WORKSPACE` in
+  `env`) only to pin the search to one specific directory.
+- **`timeoutMs` must exceed `code_search`'s 90 s internal deadline.** ZCode's default MCP
+  tool timeout is 30 s, which would cut long code searches short.
+- ZCode loads MCP servers at startup, so **quit and reopen ZCode** after adding the entry.
+  The tools then appear as `mcp__devin-search__web_search` and
+  `mcp__devin-search__code_search`.
 
 ### Any other MCP client
 
